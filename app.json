@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "coiffures",
-    "slug": "coiffures",
+    "name": "Modèles de coiffure",
+    "slug": "modeles-coiffure",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,19 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "scheme": "modelescoiffure",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L’application a besoin de tes photos pour combiner des coiffures."
+        }
+      ]
+    ]
   }
 }
