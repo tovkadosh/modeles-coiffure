@@ -33,6 +33,15 @@ export function pointTete(phi: number, theta: number): THREE.Vector3 {
   // Le front est un peu plus plat que le haut du crâne.
   const devant = Math.max(0, Math.cos(theta));
   if (phi > 0.5 && phi < Math.PI / 2) z *= 1 - 0.05 * devant * Math.sin(phi);
+  // Quelques reliefs du visage, comme sur une tête de mannequin : l'arcade
+  // sourcilière, les pommettes, le menton. Tout est devant, sous les cheveux.
+  if (devant > 0 && phi > Math.PI * 0.45) {
+    const bosse = (centre: number, largeur: number) => Math.exp(-Math.pow((phi - centre) / largeur, 2));
+    const arcade = bosse(Math.PI * 0.53, 0.1) * devant * 0.05;
+    const pommette = bosse(Math.PI * 0.63, 0.12) * Math.max(0, Math.cos(theta * 2.2)) * 0.035;
+    const menton = bosse(Math.PI * 0.85, 0.09) * Math.pow(devant, 3) * 0.035;
+    z += arcade + pommette + menton;
+  }
   return new THREE.Vector3(x, y, z);
 }
 
@@ -58,7 +67,7 @@ export function angleDepuisPlan(pt: Pt): { phi: number; theta: number } {
   // au lieu de s'écraser sur les bords. Derrière, les cheveux descendent plus bas
   // (jusqu'à la nuque) que devant (où ils s'arrêtent au front).
   const arriere = (1 - Math.cos(theta)) / 2;
-  return { phi: r * (Math.PI / 2) * (0.78 + 0.54 * Math.pow(arriere, 1.5)), theta };
+  return { phi: r * (Math.PI / 2) * (0.95 + 0.38 * Math.pow(arriere, 1.5)), theta };
 }
 
 export function poser(pt: Pt, decalage = 0): PointPose {
@@ -101,17 +110,41 @@ export function geometrieTete(): THREE.BufferGeometry {
   });
 }
 
-/** Le cou, posé sous la tête. */
-export function geometrieCou(): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(0.42, 0.52, 0.75, 40, 1, true);
-  g.translate(0, -H * 0.92, -0.04);
+/** Le bas du buste : c'est là que s'arrête le modèle. */
+export const BAS_BUSTE = -2.55;
+
+/**
+ * Le cou et le buste, comme une tête de mannequin de coiffeur :
+ * un profil tourné autour de l'axe, puis aplati d'avant en arrière.
+ */
+export function geometrieBuste(): THREE.BufferGeometry {
+  const profil: [number, number][] = [
+    [0.38, -0.78],
+    [0.39, -1.05],
+    [0.43, -1.3],
+    [0.56, -1.52],
+    [0.88, -1.72],
+    [1.26, -1.92],
+    [1.56, -2.14],
+    [1.68, -2.4],
+    [1.7, BAS_BUSTE],
+    [1.2, BAS_BUSTE],
+    [0.001, BAS_BUSTE],
+  ];
+  const g = new THREE.LatheGeometry(
+    profil.map(([r, y]) => new THREE.Vector2(r, y)),
+    64,
+  );
+  g.scale(1.22, 1, 0.6);
+  g.translate(0, 0, -0.05);
+  g.computeVertexNormals();
   return g;
 }
 
 /** Une oreille, aplatie contre le côté de la tête. */
 export function placementOreille(cote: 1 | -1) {
   const p = pointTete(Math.PI * 0.55, (cote * Math.PI) / 2);
-  return { position: [p.x * 0.97, p.y + 0.02, p.z - 0.1] as [number, number, number], echelle: [0.035, 0.13, 0.085] as [number, number, number] };
+  return { position: [p.x * 0.95, p.y + 0.02, p.z - 0.08] as [number, number, number], echelle: [0.05, 0.14, 0.095] as [number, number, number] };
 }
 
 export function placementNez() {

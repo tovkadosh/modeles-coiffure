@@ -23,6 +23,9 @@ export type Trace = {
   cellules: Cellule[];
   /** Largeur d'un rang, en unités du schéma. */
   largeur: number;
+  /** Écart entre deux rangs (ou taille d'une section), en unités du schéma.
+   *  La 3D s'en sert pour que les tresses remplissent leur part de crâne. */
+  pas: number;
   /** Nombre total d'éléments à réaliser (rangs, nattes ou vanilles). */
   total: number;
 };
@@ -60,7 +63,7 @@ function bezier(p0: Pt, p1: Pt, p2: Pt, n = 24): Pt[] {
   return pts;
 }
 
-function rangsParalleles(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number } {
+function rangsParalleles(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number; pas: number } {
   const n = f.rangs;
   const angle = f.motif === 'diagonale' ? (32 * Math.PI) / 180 : 0;
   const d: Pt = [Math.sin(angle), Math.cos(angle)];
@@ -90,10 +93,10 @@ function rangsParalleles(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number 
     const fin = pts[pts.length - 1];
     lignes.push({ pts, label: String(i + 1), posLabel: [debut[0], debut[1] - 9], perle: f.perles ? fin : undefined });
   }
-  return { lignes, largeur: pas * FACTEUR[f.epaisseur] };
+  return { lignes, largeur: pas * FACTEUR[f.epaisseur], pas };
 }
 
-function rangsEnEtoile(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number } {
+function rangsEnEtoile(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number; pas: number } {
   const n = f.rangs;
   const c: Pt = [z.cx, z.cy + 8];
   const lignes: Ligne[] = [];
@@ -108,11 +111,11 @@ function rangsEnEtoile(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number } 
     const fin = pts[pts.length - 1];
     lignes.push({ pts, label: String(i + 1), posLabel: versExterieur(z, fin, 10), perle: f.perles ? pts[0] : undefined });
   }
-  const pas = (2 * Math.PI * Math.min(z.rx, z.ry) * 0.5) / n;
-  return { lignes, largeur: Math.min(pas, 26) * FACTEUR[f.epaisseur] };
+  const pas = Math.min((2 * Math.PI * Math.min(z.rx, z.ry) * 0.5) / n, 26);
+  return { lignes, largeur: pas * FACTEUR[f.epaisseur], pas };
 }
 
-function traceFulani(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number } {
+function traceFulani(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number; pas: number } {
   const n = f.rangs;
   const lignes: Ligne[] = [];
   const largeur = Math.min(11, (z.ry * 0.85) / n) * (FACTEUR[f.epaisseur] + 0.25);
@@ -138,7 +141,7 @@ function traceFulani(f: Fiche, z: Zone): { lignes: Ligne[]; largeur: number } {
       lignes.push({ pts: arriere, label: String(n + k + 1), posLabel: versExterieur(z, q2, f.perles ? 15 : 9), perle: f.perles ? q2 : undefined });
     }
   }
-  return { lignes, largeur };
+  return { lignes, largeur, pas: largeur * 2.1 };
 }
 
 function grilleVanilles(f: Fiche, z: Zone): { cellules: Cellule[]; largeur: number } {
@@ -164,15 +167,15 @@ export function tracer(f: Fiche): Trace {
   const zone = zoneCheveux(f.degrade);
   if (f.style === 'vanilles') {
     const g = grilleVanilles(f, zone);
-    return { zone, lignes: [], cellules: g.cellules, largeur: g.largeur, total: g.cellules.length };
+    return { zone, lignes: [], cellules: g.cellules, largeur: g.largeur, pas: g.largeur, total: g.cellules.length };
   }
   if (f.style === 'fulani') {
     const t = traceFulani(f, zone);
-    return { zone, lignes: t.lignes, cellules: [], largeur: t.largeur, total: t.lignes.length };
+    return { zone, lignes: t.lignes, cellules: [], largeur: t.largeur, pas: t.pas, total: t.lignes.length };
   }
   const t = f.motif === 'rayons' ? rangsEnEtoile(f, zone) : rangsParalleles(f, zone);
   const largeur = f.style === 'barrel' ? t.largeur * 1.25 : t.largeur;
-  return { zone, lignes: t.lignes, cellules: [], largeur: Math.max(2.5, largeur), total: t.lignes.length };
+  return { zone, lignes: t.lignes, cellules: [], largeur: Math.max(2.5, largeur), pas: t.pas, total: t.lignes.length };
 }
 
 /** Tracé d'un dessin fait à la main : un trait = un rang. */

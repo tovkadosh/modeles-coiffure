@@ -4,7 +4,7 @@ Une application (téléphone et web) pour créer des modèles de coiffures : tre
 
 ## Ce que fait l'app
 
-- **Créer un modèle** : on choisit un style, le nombre de rangs, la direction, l'épaisseur, la longueur, les perles, le dégradé. L'app construit le **modèle 3D** elle-même : une tête que l'on tourne avec le doigt, avec les tresses, torsades et vanilles posées dessus. Le **schéma numéroté** vu de dessus reste disponible dans le second onglet, pour compter les rangs. Les deux viennent du même calcul : le nombre de rangs est toujours exact.
+- **Créer un modèle** : on choisit un style, le nombre de rangs, la direction, l'épaisseur, la longueur, les perles, le dégradé. L'app construit le **modèle 3D** elle-même : un buste blanc façon tête de mannequin de coiffeur, que l'on tourne avec le doigt, avec les tresses, torsades et vanilles posées dessus. Le **schéma numéroté** vu de dessus reste disponible dans le second onglet, pour compter les rangs. Les deux viennent du même calcul : le nombre de rangs est toujours exact.
 - **Dessiner à la main** : on trace chaque rang avec le doigt ou la souris sur la tête.
 - **Image réaliste** : l'IA (GPT Image, OpenAI) crée une photo à partir du modèle, à comparer avec le schéma.
 - **Combiner des photos** : l'IA (Gemini) mélange deux photos de coiffures en une seule.
@@ -28,7 +28,7 @@ npx expo start     # sur téléphone, avec l'app Expo Go (scanner le QR code)
 - `src/composants/Apercu.tsx` : la bascule entre le modèle 3D et le schéma numéroté.
 - `src/composants/Schema.tsx` : le dessin du schéma (SVG), vu de dessus.
 - `src/lib/geometrie.ts` : le calcul du tracé des rangs à partir de la fiche (source unique, en 2D).
-- `src/lib/tete3d.ts` : la forme de la tête en 3D, et le passage du schéma vu de dessus au crâne en volume.
+- `src/lib/tete3d.ts` : la forme de la tête et du buste en 3D, et le passage du schéma vu de dessus au crâne en volume.
 - `src/lib/volume3d.ts` : la fabrication des tresses, torsades, vanilles et perles en 3D.
 - `src/lib/prompt.ts` : le texte envoyé à l'IA, construit à partir de la fiche.
 - `src/lib/etapes.ts` : les étapes pour réaliser la coiffure.

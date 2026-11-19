@@ -2,13 +2,16 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GestureResponderEvent, Pressable, Text, View } from 'react-native';
 import * as THREE from 'three';
-import { geometrieCou, geometrieTete, placementBouche, placementNez, placementOeil, placementOreille } from '@/lib/tete3d';
+import { geometrieBuste, geometrieTete, placementBouche, placementNez, placementOeil, placementOreille } from '@/lib/tete3d';
 import { construire } from '@/lib/volume3d';
 import { Fiche, StyleId, Trait } from '@/lib/types';
 
-const PEAU = '#C58A5E';
-const CHEVEU = '#2A1A12';
-const RASE = '#4A2F20';
+/** Les couleurs d'une tête de mannequin de coiffeur : buste blanc, cheveux noirs. */
+const BUSTE = '#E9E9EC';
+const CREUX = '#1C1B1F';
+const CHEVEU = '#191114';
+const RASE = '#9C9BA2';
+const FOND = '#EFEBE5';
 
 type Props = {
   largeur: number;
@@ -24,9 +27,14 @@ type Props = {
 
 type Vue = { lacet: number; tangage: number };
 
+/** La peau du mannequin : un blanc laqué, qui prend la lumière comme du plâtre verni. */
+function Plastique({ couleur = BUSTE }: { couleur?: string }) {
+  return <meshPhysicalMaterial color={couleur} roughness={0.34} metalness={0} clearcoat={0.7} clearcoatRoughness={0.3} sheen={0.3} sheenColor="#FFFFFF" />;
+}
+
 function Tete() {
   const tete = useMemo(geometrieTete, []);
-  const cou = useMemo(geometrieCou, []);
+  const buste = useMemo(geometrieBuste, []);
   const oreilleG = placementOreille(-1);
   const oreilleD = placementOreille(1);
   const nez = placementNez();
@@ -36,30 +44,31 @@ function Tete() {
   return (
     <group>
       <mesh geometry={tete}>
-        <meshStandardMaterial color={PEAU} roughness={0.78} metalness={0.02} />
+        <Plastique />
       </mesh>
-      <mesh geometry={cou}>
-        <meshStandardMaterial color="#B87C52" roughness={0.8} side={THREE.DoubleSide} />
+      <mesh geometry={buste}>
+        <Plastique />
       </mesh>
       {[oreilleG, oreilleD].map((o, i) => (
         <mesh key={i} position={o.position} scale={o.echelle}>
           <sphereGeometry args={[1, 18, 14]} />
-          <meshStandardMaterial color="#B57A4F" roughness={0.85} />
+          <Plastique />
         </mesh>
       ))}
-      <mesh position={nez.position} rotation={[Math.PI / 2.1, 0, 0]}>
-        <coneGeometry args={[0.115, 0.26, 18]} />
-        <meshStandardMaterial color="#C0855A" roughness={0.8} />
+      <mesh position={[nez.position[0], nez.position[1] - 0.02, nez.position[2] - 0.08]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 1.15]}>
+        <coneGeometry args={[0.095, 0.2, 22]} />
+        <Plastique />
       </mesh>
+      {/* Les yeux sont creusés en sombre, comme sur les têtes d'entraînement. */}
       {[oeilG, oeilD].map((o, i) => (
-        <mesh key={i} position={o.position} scale={[0.072, 0.045, 0.03]}>
-          <sphereGeometry args={[1, 14, 12]} />
-          <meshStandardMaterial color="#2C1C14" roughness={0.3} />
+        <mesh key={i} position={o.position} rotation={[0, 0, (i === 0 ? 1 : -1) * 0.12]} scale={[0.085, 0.042, 0.03]}>
+          <sphereGeometry args={[1, 16, 12]} />
+          <meshStandardMaterial color={CREUX} roughness={0.5} />
         </mesh>
       ))}
-      <mesh position={bouche.position} scale={[0.1, 0.03, 0.03]}>
-        <sphereGeometry args={[1, 14, 10]} />
-        <meshStandardMaterial color="#8E4A3C" roughness={0.6} />
+      <mesh position={[bouche.position[0], bouche.position[1], bouche.position[2] - 0.055]} scale={[0.145, 0.055, 0.055]}>
+        <sphereGeometry args={[1, 20, 14]} />
+        <Plastique couleur="#DCDADF" />
       </mesh>
     </group>
   );
@@ -77,11 +86,11 @@ function Cheveux({ fiche, traits, styleTraits, couleurPerles }: { fiche?: Fiche;
     <group>
       {coiffure.rasage && (
         <mesh geometry={coiffure.rasage}>
-          <meshStandardMaterial color={RASE} roughness={0.95} side={THREE.DoubleSide} />
+          <meshStandardMaterial color={RASE} roughness={0.9} side={THREE.DoubleSide} />
         </mesh>
       )}
       <mesh geometry={coiffure.cheveux}>
-        <meshStandardMaterial color={CHEVEU} roughness={0.42} metalness={0.08} />
+        <meshPhysicalMaterial color={CHEVEU} roughness={0.46} metalness={0.05} clearcoat={0.35} clearcoatRoughness={0.4} />
       </mesh>
       {coiffure.perles && (
         <mesh geometry={coiffure.perles}>
@@ -136,22 +145,27 @@ export function Vue3D({ largeur, hauteur, fiche, traits, styleTraits = 'tresses'
 
   return (
     <View style={{ gap: 8, alignItems: 'center' }}>
-      <View style={{ width: largeur, height: h, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F3E6D6' }}>
+      <View style={{ width: largeur, height: h, borderRadius: 16, overflow: 'hidden', backgroundColor: FOND }}>
         <Canvas
           style={{ width: largeur, height: h }}
-          camera={{ position: [0, fige ? -0.1 : 0.05, fige ? 5.3 : 5.1], fov: 32 }}
+          camera={{ position: [0, 0, fige ? 6 : 6.4], fov: 32 }}
           gl={{ antialias: true }}
           dpr={typeof window !== 'undefined' ? Math.min(2, (window.devicePixelRatio as number) || 1) : 1}
         >
-          <color attach="background" args={['#F3E6D6']} />
-          <ambientLight intensity={1.1} />
-          <hemisphereLight args={['#FFF4E6', '#6B4A33', 0.8]} />
-          <directionalLight position={[2.6, 3.6, 3.2]} intensity={2.1} />
-          <directionalLight position={[-3.2, 1.2, -2.4]} intensity={0.8} color="#FFE2BE" />
+          <color attach="background" args={[FOND]} />
+          {/* Lumière de studio : une dominante en haut à droite, un remplissage
+              doux à gauche, et un contre-jour qui détache la nuque du fond. */}
+          <ambientLight intensity={0.9} />
+          <hemisphereLight args={['#FFFFFF', '#8C8A93', 1.1]} />
+          <directionalLight position={[3, 4.2, 3.4]} intensity={2.4} />
+          <directionalLight position={[-3.6, 0.8, 2]} intensity={0.9} color="#E8ECF4" />
+          <directionalLight position={[-1.4, 2.2, -4]} intensity={1.5} color="#FFFFFF" />
+          <group position={[0, fige ? 0.3 : 0.42, 0]}>
           <Pivot vue={vue}>
             <Tete />
             <Cheveux fiche={fiche} traits={traits} styleTraits={styleTraits} couleurPerles={fiche?.couleurPerles ?? '#D9A520'} />
           </Pivot>
+          </group>
         </Canvas>
         {!fige && (
           <View

@@ -268,7 +268,13 @@ export function construire(fiche: Fiche | undefined, traits?: Trait[], styleTrai
   }
 
   const trace = tracer(fiche);
-  const rayon = Math.max(0.018, trace.largeur * ECHELLE * 0.5);
+  // Sur une vraie tête, les tresses collées remplissent presque toute leur
+  // section : ce qui reste visible entre elles, ce sont les raies du crâne.
+  const remplissage: Record<Fiche['epaisseur'], number> = { fine: 0.78, moyenne: 0.95, grosse: 1.12 };
+  const plaque = style === 'tresses' || style === 'flat' || style === 'barrel';
+  const rayon = plaque
+    ? Math.max(0.02, trace.pas * ECHELLE * 0.5 * remplissage[fiche.epaisseur])
+    : Math.max(0.018, trace.largeur * ECHELLE * 0.5);
   const pend = PEND[style][fiche.longueur];
   let rayonUtile = rayon;
 
