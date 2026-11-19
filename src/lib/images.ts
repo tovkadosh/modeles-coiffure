@@ -17,3 +17,12 @@ export async function uriImage(ref: string): Promise<string | null> {
 export async function supprimerImage(ref: string): Promise<void> {
   await FileSystem.deleteAsync(dossier() + ref, { idempotent: true }).catch(() => {});
 }
+
+/** Relit une image enregistrée en base64, pour la renvoyer à l'IA. */
+export async function base64Image(ref: string): Promise<string | null> {
+  try {
+    return await FileSystem.readAsStringAsync(dossier() + ref, { encoding: 'base64' });
+  } catch {
+    return null;
+  }
+}

@@ -19,6 +19,8 @@ export default function Layout() {
         <Stack.Screen name="creer" options={{ title: 'Créer un modèle' }} />
         <Stack.Screen name="dessin" options={{ title: 'Dessiner à la main' }} />
         <Stack.Screen name="combiner" options={{ title: 'Combiner des photos' }} />
+        <Stack.Screen name="reconnaitre" options={{ title: 'Reconnaître une photo' }} />
+        <Stack.Screen name="ecole" options={{ title: 'Apprendre à l’IA' }} />
         <Stack.Screen name="reglages" options={{ title: 'Réglages' }} />
         <Stack.Screen name="modele/[id]" options={{ title: 'Mon modèle' }} />
       </Stack>

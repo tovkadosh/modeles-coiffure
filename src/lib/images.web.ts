@@ -14,3 +14,9 @@ export async function uriImage(ref: string): Promise<string | null> {
 export async function supprimerImage(ref: string): Promise<void> {
   await del(ref);
 }
+
+/** Relit une image enregistrée en base64, pour la renvoyer à l'IA. */
+export async function base64Image(ref: string): Promise<string | null> {
+  const url = await get<string>(ref);
+  return url ? url.slice(url.indexOf(',') + 1) : null;
+}
