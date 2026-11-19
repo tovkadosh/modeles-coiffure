@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Schema } from '@/composants/Schema';
+import { Apercu } from '@/composants/Apercu';
 import { Bouton, C, Carte, Champ, Compteur, Ecran, Note, Puces, s } from '@/composants/ui';
 import { tracer } from '@/lib/geometrie';
 import { enregistrerModele, nouvelId, useDonnees } from '@/lib/stockage';
@@ -61,10 +61,11 @@ export default function Creer() {
   return (
     <Ecran>
       <Carte style={{ alignItems: 'center' }}>
-        <Schema largeur={Math.min(width - 64, 270)} fiche={fiche} />
-        <Note>
-          {fiche.style === 'vanilles' ? `${total} vanilles à faire` : fiche.style === 'fulani' ? `${total} nattes à faire : la centrale (C), puis ${fiche.rangs} devant et ${fiche.rangs} derrière de chaque côté` : `${total} ${info.unite}, numérotés dans l’ordre`}
-        </Note>
+        <Apercu
+          largeur={Math.min(width - 64, 300)}
+          fiche={fiche}
+          legende={fiche.style === 'vanilles' ? `${total} vanilles à faire` : fiche.style === 'fulani' ? `${total} nattes à faire : la centrale (C), puis ${fiche.rangs} devant et ${fiche.rangs} derrière de chaque côté` : `${total} ${info.unite}, numérotés dans l’ordre sur le schéma`}
+        />
       </Carte>
 
       <Carte>
@@ -88,11 +89,9 @@ export default function Creer() {
             <Puces options={[{ valeur: 'fine', nom: 'Fines' }, { valeur: 'moyenne', nom: 'Moyennes' }, { valeur: 'grosse', nom: 'Grosses' }]} valeur={fiche.epaisseur} onChange={(epaisseur) => maj({ epaisseur })} />
           </Champ>
         )}
-        {(fiche.style === 'vanilles' || fiche.style === 'fulani') && (
-          <Champ nom="Longueur">
-            <Puces options={[{ valeur: 'court', nom: 'Court' }, { valeur: 'mi-long', nom: 'Mi-long' }, { valeur: 'long', nom: 'Long' }]} valeur={fiche.longueur} onChange={(longueur) => maj({ longueur })} />
-          </Champ>
-        )}
+        <Champ nom="Longueur">
+          <Puces options={[{ valeur: 'court', nom: 'Court' }, { valeur: 'mi-long', nom: 'Mi-long' }, { valeur: 'long', nom: 'Long' }]} valeur={fiche.longueur} onChange={(longueur) => maj({ longueur })} />
+        </Champ>
         <Interrupteur nom="Côtés en dégradé" valeur={fiche.degrade} onChange={(degrade) => maj({ degrade })} />
         <Interrupteur nom="Perles" valeur={fiche.perles} onChange={(perles) => maj({ perles })} />
         {fiche.perles && <Puces options={PERLES.map((p) => ({ valeur: p.couleur, nom: p.nom, couleur: p.couleur }))} valeur={fiche.couleurPerles} onChange={(couleurPerles) => maj({ couleurPerles })} />}

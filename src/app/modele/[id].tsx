@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Image, Text, View, useWindowDimensions } from 'react-native';
-import { Schema } from '@/composants/Schema';
+import { Apercu } from '@/composants/Apercu';
 import { Bouton, C, Carte, Ecran, Note, Titre } from '@/composants/ui';
 import { etapes } from '@/lib/etapes';
 import { genererImage } from '@/lib/ia';
@@ -66,8 +66,8 @@ export default function DetailModele() {
       <Carte style={{ flexDirection: large && m.type !== 'combinaison' ? 'row' : 'column', justifyContent: 'space-around', alignItems: 'center' }}>
         {m.type !== 'combinaison' && (
           <View style={{ alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontWeight: '700', color: C.doux }}>SCHÉMA</Text>
-            <Schema largeur={tailleVue} fiche={fiche} traits={m.traits} styleTraits={fiche?.style} />
+            <Text style={{ fontWeight: '700', color: C.doux }}>LE MODÈLE</Text>
+            <Apercu largeur={tailleVue} fiche={fiche} traits={m.traits} styleTraits={fiche?.style} />
           </View>
         )}
         <View style={{ alignItems: 'center', gap: 6 }}>
@@ -92,7 +92,7 @@ export default function DetailModele() {
               {!reglages.cleOpenAI && <Bouton titre="Ouvrir les Réglages" variante="contour" onPress={() => router.push('/reglages')} />}
             </Carte>
           ) : null}
-          <Note>L’IA ne respecte pas toujours le nombre de rangs. Pour compter, fie-toi au schéma.</Note>
+          <Note>L’IA ne respecte pas toujours le nombre de rangs. Pour compter, fie-toi au modèle 3D ou au schéma numéroté.</Note>
         </>
       )}
 

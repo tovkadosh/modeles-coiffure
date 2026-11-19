@@ -2,19 +2,29 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Schema } from '@/composants/Schema';
+import { Vue3D } from '@/composants/Vue3D';
 import { C, Carte, Ecran, Note, Titre } from '@/composants/ui';
 import { resumeFiche } from '@/lib/prompt';
 import { useDonnees, useImage } from '@/lib/stockage';
 import { ORDRE_STYLES, STYLES, ficheParDefaut } from '@/lib/styles';
 import { Modele } from '@/lib/types';
 
-function Vignette({ m }: { m: Modele }) {
+/** Au-delà de cette limite, les aperçus restent en schéma : trop de vues 3D ralentirait la page. */
+const MAX_3D = 8;
+
+function Vignette({ m, i }: { m: Modele; i: number }) {
   const uri = useImage(m.image);
   const sousTitre = m.type === 'combinaison' ? 'Combinaison de photos' : m.type === 'dessin' ? `Dessin · ${m.traits?.length ?? 0} rangs` : m.fiche ? `${STYLES[m.fiche.style].nom} · ${resumeFiche(m.fiche)}` : '';
   return (
     <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/modele/[id]', params: { id: m.id } })} style={st.vignette}>
       <View style={st.apercu}>
-        {m.type === 'combinaison' ? uri ? <Image source={{ uri }} style={st.photo} /> : null : <Schema largeur={84} fiche={m.fiche} traits={m.traits} styleTraits={m.fiche?.style} numeros={false} />}
+        {m.type === 'combinaison' ? (
+          uri ? <Image source={{ uri }} style={st.photo} /> : null
+        ) : i < MAX_3D ? (
+          <Vue3D largeur={84} hauteur={100} fiche={m.fiche} traits={m.traits} styleTraits={m.fiche?.style ?? 'tresses'} fige />
+        ) : (
+          <Schema largeur={84} fiche={m.fiche} traits={m.traits} styleTraits={m.fiche?.style} numeros={false} />
+        )}
       </View>
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={st.nom}>{m.nom}</Text>
@@ -33,7 +43,7 @@ export default function Accueil() {
       <View style={st.grille}>
         {ORDRE_STYLES.map((id) => (
           <Pressable key={id} accessibilityRole="button" onPress={() => router.push({ pathname: '/creer', params: { style: id } })} style={st.style}>
-            <Schema largeur={96} fiche={ficheParDefaut(id)} numeros={false} />
+            <Vue3D largeur={110} hauteur={120} fiche={ficheParDefaut(id)} fige />
             <Text style={st.nomStyle}>{STYLES[id].nom}</Text>
             <Text style={st.resume}>{STYLES[id].resume}</Text>
           </Pressable>
@@ -57,7 +67,7 @@ export default function Accueil() {
           <Note>Tu n’as pas encore de modèle. Choisis un style ci-dessus, règle le nombre de rangs, puis enregistre.</Note>
         </Carte>
       ) : (
-        modeles.map((m) => <Vignette key={m.id} m={m} />)
+        modeles.map((m, i) => <Vignette key={m.id} m={m} i={i} />)
       )}
 
       <Pressable accessibilityRole="button" onPress={() => router.push('/reglages')} style={{ alignSelf: 'center', padding: 12 }}>
@@ -76,7 +86,7 @@ const st = StyleSheet.create({
   action: { flexGrow: 1, flexBasis: 220, backgroundColor: '#F3E6D6', borderRadius: 16, padding: 16, gap: 4 },
   actionTitre: { fontSize: 17, fontWeight: '700', color: C.brun },
   vignette: { flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: C.carte, borderRadius: 16, borderWidth: 1, borderColor: C.bord, padding: 12 },
-  apercu: { width: 84, height: 112, alignItems: 'center', justifyContent: 'center', borderRadius: 10, overflow: 'hidden' },
+  apercu: { width: 84, height: 100, alignItems: 'center', justifyContent: 'center', borderRadius: 10, overflow: 'hidden' },
   photo: { width: 84, height: 112, borderRadius: 10 },
   nom: { fontSize: 17, fontWeight: '700', color: C.texte },
 });
