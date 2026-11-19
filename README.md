@@ -63,3 +63,10 @@ photos étiquetées et un vrai fine-tuning côté serveur.
 ## Mise en ligne
 
 À chaque envoi sur la branche `main`, `.github/workflows/site.yml` construit le site et le publie sur GitHub Pages (à activer dans les réglages du dépôt : Pages, source « GitHub Actions »).
+
+## Crédits
+
+La tête 3D est le scan « Infinite, 3D Head Scan » de Lee Perry-Smith, sous licence
+Creative Commons Attribution 3.0 (basé sur un travail de www.triplegangers.com).
+Le fichier d'origine et sa licence sont dans `assets/tete/`. Pour régénérer
+`src/lib/teteScan.ts` après un changement : `node scripts/preparer-tete.mjs`.

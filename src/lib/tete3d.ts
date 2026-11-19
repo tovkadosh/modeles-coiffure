@@ -1,84 +1,176 @@
 import * as THREE from 'three';
 import { TETE } from './geometrie';
+import { SCAN } from './teteScan';
 import { Pt } from './types';
 
 /**
- * La tête en 3D. Tout part d'un ellipsoïde déformé : le haut sert de crâne
- * (c'est là que se posent les rangs), le bas devient le visage et la nuque.
- * Les mêmes formules servent à dessiner la tête et à poser les tresses dessus,
- * donc les tresses collent toujours à la peau.
+ * La tête en 3D : une vraie tête sculptée (scan libre de droits, voir
+ * assets/tete/LICENCE.txt), préparée par scripts/preparer-tete.mjs.
+ *
+ * Pour poser les cheveux, on repère un point du crâne par deux angles depuis le
+ * centre du crâne : `phi` (0 au sommet, π/2 à hauteur des sourcils) et `theta`
+ * (0 devant). La carte des rayons donne, pour chaque direction, la distance
+ * jusqu'à la peau : les tresses tombent donc exactement sur le crâne sculpté.
  */
-export const A = 0.95;   // demi-largeur (gauche-droite)
-export const B = 1.27;   // demi-profondeur (front-nuque)
-export const H = 1.2;    // demi-hauteur
+export const A = 0.95; // demi-largeur du crâne (gauche-droite)
+export const B = 1.25; // demi-profondeur du crâne (front-nuque)
+export const H = 1.22; // hauteur du crâne au-dessus de son centre
 
-/** Un point de la surface. `phi` : 0 au sommet, π/2 à hauteur des oreilles. `theta` : 0 devant. */
-export function pointTete(phi: number, theta: number): THREE.Vector3 {
-  const s = Math.sin(phi);
-  const c = Math.cos(phi);
-  let x = A * s * Math.sin(theta);
-  let z = B * s * Math.cos(theta);
-  let y = H * c;
-  // Sous la ligne des oreilles, la tête se resserre vers le menton et la nuque.
-  const t = Math.max(0, (phi - Math.PI / 2) / (Math.PI / 2));
-  if (t > 0) {
-    const k = Math.pow(t, 1.35);
-    const arriere = Math.max(0, -Math.cos(theta));
-    // Le visage se resserre vers le menton, la nuque rentre sous le crâne.
-    x *= 1 - 0.42 * k;
-    z *= 1 - 0.12 * k - 0.42 * arriere * k;
-    // Le bas du visage est moins haut qu'une demi-sphère : sinon la tête fait un œuf.
-    y *= 1 - 0.2 * k;
+// --- Décodage des données compactes ---------------------------------------
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const VALEUR = new Uint8Array(128);
+for (let i = 0; i < ALPHABET.length; i++) VALEUR[ALPHABET.charCodeAt(i)] = i;
+
+/** Base64 → octets, sans dépendre d'atob (absent de certains moteurs mobiles). */
+function octets(b64: string): Uint8Array {
+  const propre = b64.replace(/=+$/, '');
+  const out = new Uint8Array(Math.floor((propre.length * 3) / 4));
+  let o = 0;
+  for (let i = 0; i < propre.length; i += 4) {
+    const a = VALEUR[propre.charCodeAt(i)];
+    const b = VALEUR[propre.charCodeAt(i + 1)];
+    const c = i + 2 < propre.length ? VALEUR[propre.charCodeAt(i + 2)] : 0;
+    const d = i + 3 < propre.length ? VALEUR[propre.charCodeAt(i + 3)] : 0;
+    const n = (a << 18) | (b << 12) | (c << 6) | d;
+    if (o < out.length) out[o++] = (n >> 16) & 255;
+    if (o < out.length) out[o++] = (n >> 8) & 255;
+    if (o < out.length) out[o++] = n & 255;
   }
-  // Le front est un peu plus plat que le haut du crâne.
-  const devant = Math.max(0, Math.cos(theta));
-  if (phi > 0.5 && phi < Math.PI / 2) z *= 1 - 0.05 * devant * Math.sin(phi);
-  // Quelques reliefs du visage, comme sur une tête de mannequin : l'arcade
-  // sourcilière, les pommettes, le menton. Tout est devant, sous les cheveux.
-  if (devant > 0 && phi > Math.PI * 0.45) {
-    const bosse = (centre: number, largeur: number) => Math.exp(-Math.pow((phi - centre) / largeur, 2));
-    const arcade = bosse(Math.PI * 0.53, 0.1) * devant * 0.05;
-    const pommette = bosse(Math.PI * 0.63, 0.12) * Math.max(0, Math.cos(theta * 2.2)) * 0.035;
-    const menton = bosse(Math.PI * 0.85, 0.09) * Math.pow(devant, 3) * 0.035;
-    z += arcade + pommette + menton;
-  }
-  return new THREE.Vector3(x, y, z);
+  return out;
 }
 
-/** La normale à la surface : sert à poser les tresses juste au-dessus de la peau. */
+const u16 = (b64: string) => {
+  const o = octets(b64);
+  return new Uint16Array(o.buffer, o.byteOffset, o.byteLength >> 1);
+};
+
+const { nPhi: NPHI, nTheta: NTHETA, rayonMax } = SCAN.carte;
+const RAYONS = (() => {
+  const q = u16(SCAN.carte.rayons);
+  const r = new Float32Array(q.length);
+  for (let i = 0; i < q.length; i++) r[i] = (q[i] / 65535) * rayonMax;
+  return r;
+})();
+
+// --- La surface du crâne ---------------------------------------------------
+
+/** La direction (normée) qui part du centre du crâne pour ces deux angles. */
+function direction(phi: number, theta: number): THREE.Vector3 {
+  const s = Math.sin(phi);
+  return new THREE.Vector3(A * s * Math.sin(theta), H * Math.cos(phi), B * s * Math.cos(theta)).normalize();
+}
+
+/** Les deux angles qui correspondent à la direction d'un point. */
+export function anglesDe(p: THREE.Vector3): { phi: number; theta: number } {
+  const x = p.x / A;
+  const y = p.y / H;
+  const z = p.z / B;
+  return { phi: Math.atan2(Math.hypot(x, z), y), theta: Math.atan2(x, z) };
+}
+
+/** Distance du centre du crâne à la peau, lue dans la carte (interpolation bilinéaire). */
+function rayonEn(phi: number, theta: number): number {
+  const fi = Math.max(0, Math.min(NPHI - 1.0001, (phi / Math.PI) * (NPHI - 1)));
+  const i = Math.floor(fi);
+  const ti = fi - i;
+  let fj = ((theta + Math.PI) / (2 * Math.PI)) * NTHETA;
+  fj = ((fj % NTHETA) + NTHETA) % NTHETA;
+  const j = Math.floor(fj);
+  const tj = fj - j;
+  const j2 = (j + 1) % NTHETA;
+  const r = (a: number, b: number) => RAYONS[a * NTHETA + b];
+  const haut = r(i, j) * (1 - tj) + r(i, j2) * tj;
+  const bas = r(i + 1, j) * (1 - tj) + r(i + 1, j2) * tj;
+  return haut * (1 - ti) + bas * ti;
+}
+
+/** Un point de la peau. */
+export function pointTete(phi: number, theta: number): THREE.Vector3 {
+  return direction(phi, theta).multiplyScalar(rayonEn(phi, theta));
+}
+
+/** La normale à la peau en ce point, calculée sur la surface sculptée elle-même. */
+export function normaleEn(phi: number, theta: number): THREE.Vector3 {
+  const e = 0.012;
+  const p = pointTete(phi, theta);
+  if (phi < 0.05) return new THREE.Vector3(0, 1, 0);
+  const dPhi = pointTete(phi + e, theta).sub(pointTete(phi - e, theta));
+  const dTheta = pointTete(phi, theta + e).sub(pointTete(phi, theta - e));
+  const n = new THREE.Vector3().crossVectors(dPhi, dTheta).normalize();
+  if (n.dot(p) < 0) n.negate();
+  return n;
+}
+
+/** La normale à la peau sous un point quelconque. */
 export function normaleTete(p: THREE.Vector3): THREE.Vector3 {
-  return new THREE.Vector3(p.x / (A * A), p.y / (H * H), p.z / (B * B)).normalize();
+  const { phi, theta } = anglesDe(p);
+  return normaleEn(phi, theta);
+}
+
+/**
+ * Repousse un point hors de la peau (tête, cou, épaules) : les cheveux qui
+ * pendent ne doivent jamais rentrer dans le buste.
+ */
+export function horsPeau(p: THREE.Vector3, marge: number): THREE.Vector3 {
+  const l = p.length();
+  if (l < 1e-6) return p;
+  const { phi, theta } = anglesDe(p);
+  const r = rayonEn(phi, theta) + marge;
+  if (l < r) p.multiplyScalar(r / l);
+  return p;
 }
 
 export type PointPose = { p: THREE.Vector3; n: THREE.Vector3 };
 
 /**
- * Convertit un point du schéma vu de dessus (repère SVG, front en haut)
- * en un point posé sur le crâne en 3D.
+ * Jusqu'où descendent les cheveux, selon le côté de la tête : la lisière est
+ * au milieu du front devant, juste au-dessus des oreilles sur les côtés, et à
+ * la nuque derrière.
+ */
+export function etendue(theta: number): number {
+  const arriere = (1 - Math.cos(theta)) / 2;
+  return 0.73 + 0.7 * Math.pow(arriere, 1.22);
+}
+
+/** Facteur qui ramène les rangs extérieurs contre la lisière des cheveux. */
+const ETIREMENT = 1.07;
+
+/**
+ * Convertit un point du schéma vu de dessus (repère SVG, front en haut, droite
+ * de la personne à droite) en deux angles sur le crâne.
  */
 export function angleDepuisPlan(pt: Pt): { phi: number; theta: number } {
   const u = (pt[0] - TETE.cx) / TETE.rx;
   const v = (pt[1] - TETE.cy) / TETE.ry;
-  // Les rangs extérieurs sont ramenés contre la lisière des cheveux : sinon,
-  // vu en 3D, il resterait une bande de crâne nu au-dessus des oreilles.
-  const r = Math.min(1, Math.hypot(u, v) * 1.07);
-  const theta = r < 1e-4 ? Math.PI : Math.atan2(u, -v);
-  // Le rayon vu de dessus devient un angle : les rangs s'étalent sur tout le dôme
-  // au lieu de s'écraser sur les bords. Derrière, les cheveux descendent plus bas
-  // (jusqu'à la nuque) que devant (où ils s'arrêtent au front).
-  const arriere = (1 - Math.cos(theta)) / 2;
-  return { phi: r * (Math.PI / 2) * (0.95 + 0.38 * Math.pow(arriere, 1.5)), theta };
+  const r = Math.min(1, Math.hypot(u, v) * ETIREMENT);
+  // Vu de dessus, la droite de la personne est à droite du schéma ; en 3D,
+  // face à nous, sa droite est du côté des x négatifs.
+  const theta = r < 1e-4 ? Math.PI : Math.atan2(-u, -v);
+  // Le rayon vu de dessus devient un angle : les rangs s'étalent sur tout le
+  // dôme au lieu de s'écraser sur les bords.
+  return { phi: r * (Math.PI / 2) * etendue(theta), theta };
+}
+
+/** L'inverse : le point du schéma qui tombe sur ces deux angles (null hors des cheveux). */
+export function planDepuisAngle(phi: number, theta: number): Pt | null {
+  const r = phi / ((Math.PI / 2) * etendue(theta));
+  if (r > 1) return null;
+  const h = r / ETIREMENT;
+  const u = -h * Math.sin(theta);
+  const v = -h * Math.cos(theta);
+  return [TETE.cx + u * TETE.rx, TETE.cy + v * TETE.ry];
 }
 
 export function poser(pt: Pt, decalage = 0): PointPose {
   const { phi, theta } = angleDepuisPlan(pt);
   const p = pointTete(phi, theta);
-  const n = normaleTete(p);
+  const n = normaleEn(phi, theta);
   if (decalage) p.addScaledVector(n, decalage);
   return { p, n };
 }
 
-/** À quelle hauteur du crâne se trouve ce point du schéma (0 au sommet, 1 aux oreilles). */
+/** À quelle hauteur du crâne se trouve ce point du schéma (0 au sommet, 1 à la lisière). */
 export function avancee(pt: Pt): number {
   const u = (pt[0] - TETE.cx) / TETE.rx;
   const v = (pt[1] - TETE.cy) / TETE.ry;
@@ -88,76 +180,49 @@ export function avancee(pt: Pt): number {
 /** L'échelle entre les unités du schéma et celles de la 3D. */
 export const ECHELLE = 1 / TETE.rx;
 
-function deformer(g: THREE.BufferGeometry, f: (v: THREE.Vector3) => THREE.Vector3) {
-  const pos = g.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const w = f(v);
-    pos.setXYZ(i, w.x, w.y, w.z);
-  }
-  g.computeVertexNormals();
-  return g;
-}
+// --- Le maillage de la tête ------------------------------------------------
 
-/** Le maillage de la tête, construit à partir d'une sphère redessinée par `pointTete`. */
+/** Les yeux, creusés en noir comme sur les têtes de mannequin. */
+const YEUX = { x: 0.37, y: -0.215, rx: 0.155, ry: 0.07, zMin: 0.9 };
+/** La couleur du buste et celle des yeux. */
+export const COULEUR_BUSTE = new THREE.Color('#ECECEF');
+const COULEUR_YEUX = new THREE.Color('#121114');
+
+/** Le maillage du buste sculpté, avec les yeux peints en noir. */
 export function geometrieTete(): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(1, 72, 54, 0, Math.PI * 2, 0, Math.PI * 0.92);
-  return deformer(g, (v) => {
-    const phi = Math.acos(Math.max(-1, Math.min(1, v.y)));
-    const theta = Math.atan2(v.x, v.z);
-    return pointTete(phi, theta);
-  });
-}
-
-/** Le bas du buste : c'est là que s'arrête le modèle. */
-export const BAS_BUSTE = -2.55;
-
-/**
- * Le cou et le buste, comme une tête de mannequin de coiffeur :
- * un profil tourné autour de l'axe, puis aplati d'avant en arrière.
- */
-export function geometrieBuste(): THREE.BufferGeometry {
-  const profil: [number, number][] = [
-    [0.38, -0.78],
-    [0.39, -1.05],
-    [0.43, -1.3],
-    [0.56, -1.52],
-    [0.88, -1.72],
-    [1.26, -1.92],
-    [1.56, -2.14],
-    [1.68, -2.4],
-    [1.7, BAS_BUSTE],
-    [1.2, BAS_BUSTE],
-    [0.001, BAS_BUSTE],
-  ];
-  const g = new THREE.LatheGeometry(
-    profil.map(([r, y]) => new THREE.Vector2(r, y)),
-    64,
-  );
-  g.scale(1.22, 1, 0.6);
-  g.translate(0, 0, -0.05);
-  g.computeVertexNormals();
+  const q = u16(SCAN.positions);
+  const nq = octets(SCAN.normales);
+  const n = SCAN.sommets;
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < 3; k++) {
+      pos[i * 3 + k] = SCAN.min[k] + (q[i * 3 + k] / 65535) * (SCAN.max[k] - SCAN.min[k]);
+      const v = (nq[i * 3 + k] << 24) >> 24; // octet signé
+      nor[i * 3 + k] = v / 127;
+    }
+    const x = pos[i * 3];
+    const y = pos[i * 3 + 1];
+    const z = pos[i * 3 + 2];
+    // Un œil en amande de chaque côté : plein noir au centre, fondu sur le bord.
+    let oeil = 0;
+    if (z > YEUX.zMin) {
+      for (const cote of [-1, 1]) {
+        const d = Math.hypot((x - cote * YEUX.x) / YEUX.rx, (y - YEUX.y) / YEUX.ry);
+        oeil = Math.max(oeil, Math.min(1, Math.max(0, (1.12 - d) / 0.25)));
+      }
+    }
+    const c = COULEUR_BUSTE.clone().lerp(COULEUR_YEUX, oeil);
+    col[i * 3] = c.r;
+    col[i * 3 + 1] = c.g;
+    col[i * 3 + 2] = c.b;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(u16(SCAN.indices), 1));
+  g.computeBoundingSphere();
   return g;
-}
-
-/** Une oreille, aplatie contre le côté de la tête. */
-export function placementOreille(cote: 1 | -1) {
-  const p = pointTete(Math.PI * 0.55, (cote * Math.PI) / 2);
-  return { position: [p.x * 0.95, p.y + 0.02, p.z - 0.08] as [number, number, number], echelle: [0.05, 0.14, 0.095] as [number, number, number] };
-}
-
-export function placementNez() {
-  const p = pointTete(Math.PI * 0.63, 0);
-  return { position: [0, p.y + 0.02, p.z + 0.04] as [number, number, number] };
-}
-
-export function placementOeil(cote: 1 | -1) {
-  const p = pointTete(Math.PI * 0.545, (cote * Math.PI) / 8);
-  return { position: [p.x, p.y, p.z + 0.01] as [number, number, number] };
-}
-
-export function placementBouche() {
-  const p = pointTete(Math.PI * 0.72, 0);
-  return { position: [0, p.y, p.z + 0.01] as [number, number, number] };
 }
