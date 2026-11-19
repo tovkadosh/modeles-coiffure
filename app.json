@@ -21,7 +21,15 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "name": "Modèles de coiffure",
+      "shortName": "Coiffures",
+      "lang": "fr",
+      "themeColor": "#7A3E1D",
+      "backgroundColor": "#FBF6F0",
+      "display": "standalone",
+      "description": "Créer des modèles de coiffures : tresses, flat twists, barrel twists, vanilles, fulani.",
+      "orientation": "portrait"
     },
     "scheme": "modelescoiffure",
     "plugins": [
