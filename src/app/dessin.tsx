@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { GestureResponderEvent, TextInput, View, useWindowDimensions } from 'react-native';
+import { GestureResponderEvent, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { Schema } from '@/composants/Schema';
+import { Vue3D } from '@/composants/Vue3D';
 import { Bouton, C, Champ, Note, Puces, s } from '@/composants/ui';
 import { TETE, VB, dansZone } from '@/lib/geometrie';
 import { enregistrerModele, nouvelId, useDonnees } from '@/lib/stockage';
@@ -13,7 +14,7 @@ export default function Dessin() {
   const { modeles, pret } = useDonnees();
   const existant = params.id ? modeles.find((m) => m.id === params.id) : undefined;
   const { width, height } = useWindowDimensions();
-  const largeur = Math.max(200, Math.min(width - 32, 360, (height - 380) * (VB.w / VB.h)));
+  const largeur = Math.max(200, Math.min(width - 32, 360, (height - 300) * (VB.w / VB.h)));
   const [traits, setTraits] = useState<Trait[]>([]);
   const [style, setStyle] = useState<StyleId>('tresses');
   const [nom, setNom] = useState('');
@@ -71,7 +72,7 @@ export default function Dessin() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.fond, alignItems: 'center', padding: 16 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.fond }} contentContainerStyle={{ alignItems: 'center', padding: 16, paddingBottom: 48 }}>
       <View style={{ width: '100%', maxWidth: 720, gap: 12, alignItems: 'center' }}>
         <Note>Trace chaque rang avec le doigt (ou la souris) sur la tête. Un trait = un rang.</Note>
         <View style={{ width: largeur, height: (largeur * VB.h) / VB.w, backgroundColor: C.carte, borderRadius: 16, borderWidth: 1, borderColor: C.bord }}>
@@ -89,6 +90,12 @@ export default function Dessin() {
           />
         </View>
         <Note>{traits.length === 0 ? 'Aucun rang pour l’instant.' : `${traits.length} rang${traits.length > 1 ? 's' : ''} tracé${traits.length > 1 ? 's' : ''}.`}</Note>
+        {traits.length > 0 && (
+          <View style={{ alignItems: 'center', gap: 6 }}>
+            <Note>Ton dessin en 3D :</Note>
+            <Vue3D largeur={Math.min(largeur, 260)} traits={traits} styleTraits={style} />
+          </View>
+        )}
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <Bouton titre="Annuler le dernier" variante="contour" desactive={traits.length === 0} onPress={() => setTraits((t) => t.slice(0, -1))} />
           <Bouton titre="Tout effacer" variante="contour" desactive={traits.length === 0} onPress={() => setTraits([])} />
@@ -101,6 +108,6 @@ export default function Dessin() {
           <Bouton titre="Enregistrer le dessin" onPress={enregistrer} desactive={traits.length === 0} />
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
