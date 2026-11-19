@@ -60,3 +60,50 @@ export async function combinerPhotos(photos: ImageIA[], consigne: string, r: Reg
   if (!image) throw new ErreurIA('Gemini n’a pas renvoyé d’image. Essaie avec une consigne plus simple.');
   return image;
 }
+
+const dataUri = (p: ImageIA) => `data:${p.mime};base64,${p.base64}`;
+
+/**
+ * Images + question → réponse en texte, avec un modèle qui sait lire les images (OpenAI).
+ * Sert à reconnaître une coiffure sur une photo.
+ */
+export async function analyserImages(photos: ImageIA[], question: string, r: Reglages): Promise<string> {
+  if (!r.cleOpenAI) throw new ErreurIA('Ajoute ta clé OpenAI dans les Réglages pour que l’IA puisse regarder une photo.');
+  const rep = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${r.cleOpenAI}` },
+    body: JSON.stringify({
+      model: r.modeleVision,
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: question }, ...photos.map((p) => ({ type: 'image_url', image_url: { url: dataUri(p), detail: 'high' } }))],
+        },
+      ],
+    }),
+  });
+  if (!rep.ok) {
+    if (rep.status === 404 || rep.status === 400) {
+      const dispo = await modelesQuiLisentLesImages(r.cleOpenAI).catch(() => []);
+      if (dispo.length) throw new ErreurIA(`OpenAI ne connaît pas le modèle « ${r.modeleVision} ». Dans les Réglages, mets plutôt : ${dispo.slice(0, 3).join(', ')}.`);
+    }
+    await lireErreur(rep, 'OpenAI');
+  }
+  const j = await rep.json();
+  const c = j?.choices?.[0]?.message?.content;
+  const texte = typeof c === 'string' ? c : Array.isArray(c) ? c.map((x: any) => x?.text ?? '').join('') : '';
+  if (!texte.trim()) throw new ErreurIA('OpenAI n’a rien répondu. Réessaie.');
+  return texte;
+}
+
+/** Les modèles du compte qui savent lire une image, du plus récent au plus ancien. */
+export async function modelesQuiLisentLesImages(cle: string): Promise<string[]> {
+  const rep = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${cle}` } });
+  if (!rep.ok) await lireErreur(rep, 'OpenAI');
+  const j = await rep.json();
+  const exclus = /image|audio|tts|whisper|embedding|moderation|realtime|transcribe|search|sora|dall|codex/i;
+  return (j?.data ?? [])
+    .filter((m: any) => typeof m?.id === 'string' && /^(gpt|o\d|chatgpt)/i.test(m.id) && !exclus.test(m.id))
+    .sort((a: any, b: any) => (b?.created ?? 0) - (a?.created ?? 0))
+    .map((m: any) => m.id as string);
+}

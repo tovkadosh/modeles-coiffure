@@ -1,5 +1,6 @@
+import { REFERENCES } from './reference';
 import { MOTIFS, PERLES, STYLES } from './styles';
-import { Fiche } from './types';
+import { Fiche, StyleId } from './types';
 
 const MOTIF_EN: Record<Fiche['motif'], string> = {
   droit: 'going straight back from the hairline to the nape',
@@ -11,24 +12,38 @@ const MOTIF_EN: Record<Fiche['motif'], string> = {
 const TAILLE_EN = { fine: 'thin', moyenne: 'medium-size', grosse: 'thick' } as const;
 const LONGUEUR_EN = { court: 'short, ending at the nape', 'mi-long': 'shoulder-length', long: 'long, reaching the mid-back' } as const;
 
-/** Texte envoyé à l'IA (en anglais : les IA d'images le suivent mieux, voir le banc d'essai). */
-export function construirePrompt(f: Fiche): string {
+/**
+ * Texte envoyé à l'IA (en anglais : les IA d'images le suivent mieux, voir le banc d'essai).
+ *
+ * Le texte est construit à partir de la fiche de référence du style (lib/reference),
+ * et il dit aussi ce que l'image ne doit PAS montrer : sans ça, les IA ramènent
+ * presque toujours des tresses collées, qui sont la coiffure la plus représentée
+ * dans leurs données.
+ */
+export function construirePrompt(f: Fiche, notes: Partial<Record<StyleId, string>> = {}): string {
   const qui = f.genre === 'homme' ? 'a Black man' : 'a Black woman';
   const perle = PERLES.find((p) => p.couleur === f.couleurPerles)?.anglais ?? 'gold';
   const taille = TAILLE_EN[f.epaisseur];
-  let coiffure = '';
-  if (f.style === 'tresses') coiffure = `exactly ${f.rangs} ${taille} cornrows ${MOTIF_EN[f.motif]}, neat even parts`;
-  if (f.style === 'flat') coiffure = `exactly ${f.rangs} ${taille} flat twists ${MOTIF_EN[f.motif]}, two-strand twists lying flat against the scalp, clean parts`;
-  if (f.style === 'barrel') coiffure = `exactly ${f.rangs} barrel twists, thick rope-like twisted sections arranged in rows ${MOTIF_EN[f.motif]}`;
-  if (f.style === 'vanilles') coiffure = `${taille} two-strand twists (vanilles), ${LONGUEUR_EN[f.longueur]}, ${f.sections === 'brique' ? 'brick-layout' : 'square'} parts in a grid of ${f.rangs} rows from front to back`;
-  if (f.style === 'fulani') coiffure = `Fulani braids: one cornrow down the middle of the head toward the back, ${f.rangs} ${taille} cornrows on each side braided toward the face, ${f.rangs} cornrows on each side going to the nape, braids ${LONGUEUR_EN[f.longueur]}`;
+  const ref = REFERENCES[f.style];
+
+  // Les précisions qui dépendent des réglages de la fiche, en plus de la description de référence.
+  let precisions = '';
+  if (f.style === 'tresses') precisions = `exactly ${f.rangs} ${taille} rows ${MOTIF_EN[f.motif]}`;
+  if (f.style === 'flat') precisions = `exactly ${f.rangs} ${taille} rows ${MOTIF_EN[f.motif]}`;
+  if (f.style === 'barrel') precisions = `exactly ${f.rangs} thick rows ${MOTIF_EN[f.motif]}`;
+  if (f.style === 'vanilles') precisions = `${taille} twists, ${LONGUEUR_EN[f.longueur]}, ${f.sections === 'brique' ? 'brick-layout' : 'square'} parts in a grid of ${f.rangs} rows from front to back`;
+  if (f.style === 'fulani') precisions = `${f.rangs} ${taille} cornrows braided toward the face on each side and ${f.rangs} going to the nape, braids ${LONGUEUR_EN[f.longueur]}`;
+
   const morceaux = [
-    `Photorealistic photo of ${qui} with ${coiffure}`,
+    `Photorealistic photo of ${qui} with ${ref.anglais}`,
+    precisions,
     f.perles ? `${perle} beads at the ends of the braids` : '',
     f.degrade ? 'taper fade on the sides' : '',
     f.style === 'vanilles' ? 'front view' : 'top view and side view',
     'natural 4C hair, studio lighting, plain background',
+    notes[f.style]?.trim() ?? '',
     f.details.trim(),
+    `IMPORTANT: ${ref.pasCeci.join(', ')}`,
   ];
   return morceaux.filter(Boolean).join(', ');
 }

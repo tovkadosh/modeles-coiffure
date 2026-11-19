@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Image, Text, View, useWindowDimensions } from 'react-native';
 import { Schema } from '@/composants/Schema';
 import { Bouton, C, Carte, Ecran, Note, Titre } from '@/composants/ui';
+import { useEcole } from '@/lib/ecole';
 import { etapes } from '@/lib/etapes';
 import { genererImage } from '@/lib/ia';
 import { enregistrerImage, supprimerImage } from '@/lib/images';
@@ -13,6 +14,7 @@ import { STYLES } from '@/lib/styles';
 export default function DetailModele() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { modeles, reglages, pret } = useDonnees();
+  const { ecole } = useEcole();
   const m = modeles.find((x) => x.id === id);
   const uri = useImage(m?.image);
   const { width } = useWindowDimensions();
@@ -35,7 +37,7 @@ export default function DetailModele() {
   const large = width >= 640;
   const tailleVue = large ? Math.min((Math.min(width, 720) - 80) / 2, 300) : Math.min(width - 64, 320);
   const fiche = m.fiche;
-  const prompt = fiche ? construirePrompt(m.type === 'dessin' ? { ...fiche, rangs: m.traits?.length ?? fiche.rangs, details: `custom braid pattern, ${fiche.details}` } : fiche) : '';
+  const prompt = fiche ? construirePrompt(m.type === 'dessin' ? { ...fiche, rangs: m.traits?.length ?? fiche.rangs, details: `custom braid pattern, ${fiche.details}` } : fiche, ecole.notes) : '';
 
   const generer = async () => {
     setErreur('');

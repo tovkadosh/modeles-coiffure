@@ -9,6 +9,7 @@ const CLE_REGLAGES = 'reglages-v1';
 export const REGLAGES_DEFAUT: Reglages = {
   cleOpenAI: '',
   modeleOpenAI: 'gpt-image-2.5-flare',
+  modeleVision: 'gpt-5.2',
   cleGemini: '',
   modeleGemini: 'gemini-nano-banana-2.1',
 };
