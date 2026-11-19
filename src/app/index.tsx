@@ -59,6 +59,14 @@ export default function Accueil() {
           <Text style={st.actionTitre}>Combiner des photos</Text>
           <Note>Mélange deux coiffures en une seule image.</Note>
         </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/reconnaitre')} style={st.action}>
+          <Text style={st.actionTitre}>Reconnaître une photo</Text>
+          <Note>L’IA dit quelle coiffure c’est, et tu la corriges si elle se trompe.</Note>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/ecole')} style={st.action}>
+          <Text style={st.actionTitre}>Apprendre à l’IA</Text>
+          <Note>Tes exemples corrigés et tes notes, que l’IA relit à chaque fois.</Note>
+        </Pressable>
       </View>
 
       <Titre>Mes modèles</Titre>

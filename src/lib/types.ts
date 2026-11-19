@@ -42,6 +42,8 @@ export type Modele = {
 export type Reglages = {
   cleOpenAI: string;
   modeleOpenAI: string;
+  /** Modèle OpenAI qui sait lire une photo (reconnaissance de coiffure). */
+  modeleVision: string;
   cleGemini: string;
   modeleGemini: string;
 };

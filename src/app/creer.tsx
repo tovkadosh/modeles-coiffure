@@ -18,11 +18,16 @@ function Interrupteur({ nom, valeur, onChange }: { nom: string; valeur: boolean;
 }
 
 export default function Creer() {
-  const params = useLocalSearchParams<{ style?: string; id?: string }>();
+  const params = useLocalSearchParams<{ style?: string; id?: string; rangs?: string }>();
   const { modeles, pret } = useDonnees();
   const existant = params.id ? modeles.find((m) => m.id === params.id) : undefined;
   const styleInitial = (ORDRE_STYLES as string[]).includes(params.style ?? '') ? (params.style as StyleId) : 'tresses';
-  const [fiche, setFiche] = useState<Fiche>(() => ficheParDefaut(styleInitial));
+  const [fiche, setFiche] = useState<Fiche>(() => {
+    const d = ficheParDefaut(styleInitial);
+    const n = Number(params.rangs);
+    const info = STYLES[styleInitial];
+    return Number.isFinite(n) && n > 0 ? { ...d, rangs: Math.max(info.min, Math.min(info.max, Math.round(n))) } : d;
+  });
   const [nom, setNom] = useState('');
   const [charge, setCharge] = useState(false);
   const { width } = useWindowDimensions();
